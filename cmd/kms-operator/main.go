@@ -19,6 +19,7 @@ import (
 var (
 	providerGoogle       = flag.Bool("google-provider", false, "Enable Google Cloud provider")
 	serviceAccountGoogle = flag.String("google-service-account", "", "Path to Google Cloud service acccount to override default service account")
+	providerAws          = flag.Bool("aws-provider", false, "Enable AWS provider")
 )
 
 func printVersion() {
@@ -32,6 +33,7 @@ func main() {
 	flag.Parse()
 
 	googleCloudKMS, err := clients.GetGoogleCloudKMS(*providerGoogle, *serviceAccountGoogle)
+	awsKMS, err := clients.GetAwsKMS(*providerAws)
 
 	sdk.ExposeMetricsPort()
 
@@ -46,6 +48,11 @@ func main() {
 	resyncPeriod := time.Duration(60) * time.Second
 	logrus.Infof("Watching %s, %s, %s, %d", resource, kind, namespace, resyncPeriod)
 	sdk.Watch(resource, kind, namespace, resyncPeriod)
-	sdk.Handle(stub.NewHandler(googleCloudKMS))
+
+	cloudDec := stub.NewCloudKMSDecryptor(googleCloudKMS)
+	awsDec := stub.NewAwsKMSDecryptor(awsKMS)
+
+	sdk.Handle(stub.NewHandler(cloudDec))
+	sdk.Handle(stub.NewHandler(awsDec))
 	sdk.Run(context.TODO())
 }

@@ -28,7 +28,8 @@ type SecretKMSSpec struct {
 }
 
 type KMSProvider struct {
-	GoogleCloud *GoogleCloudProvider `json:"google-cloud"`
+	GoogleCloud *GoogleCloudProvider `json:"google-cloud",omitempty`
+	Aws         *AwsProvider         `json:"aws"`
 }
 
 type GoogleCloudProvider struct {
@@ -37,6 +38,10 @@ type GoogleCloudProvider struct {
 	Keyring  string `json:"keyring"`
 	Key      string `json:"key"`
 	Data     string `json:"data"`
+}
+
+type AwsProvider struct {
+	Data string `json:"data"`
 }
 
 type SecretKMSStatus struct {

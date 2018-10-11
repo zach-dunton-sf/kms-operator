@@ -2,12 +2,8 @@ package stub
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/kubaj/kms-operator/pkg/apis/kubaj/v1alpha1"
-	cloudkms "google.golang.org/api/cloudkms/v1"
-
-	"encoding/base64"
 
 	"github.com/operator-framework/operator-sdk/pkg/sdk"
 	"github.com/sirupsen/logrus"
@@ -16,15 +12,18 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// NewHandler constructs Handler
-func NewHandler(cloudKMS *cloudkms.Service) sdk.Handler {
+func NewHandler(decryptor Decryptor) sdk.Handler {
 	return &Handler{
-		CloudKMS: cloudKMS,
+		Decryptor: decryptor,
 	}
 }
 
+type Decryptor interface {
+	Decrypt(cr *v1alpha1.SecretKMS) ([]byte, error)
+}
+
 type Handler struct {
-	CloudKMS *cloudkms.Service
+	Decryptor Decryptor
 }
 
 // Handle is method for handling all watched events
@@ -72,30 +71,7 @@ func (h *Handler) CreateSecret(cr *v1alpha1.SecretKMS) error {
 
 	logrus.Debugf("Creating Secret from SecretKMS %s", cr.Name)
 
-	parent := fmt.Sprintf("projects/%s/locations/%s/keyRings/%s/cryptoKeys/%s",
-		cr.Spec.Provider.GoogleCloud.Project,
-		cr.Spec.Provider.GoogleCloud.Location,
-		cr.Spec.Provider.GoogleCloud.Keyring,
-		cr.Spec.Provider.GoogleCloud.Key)
-
-	req := &cloudkms.DecryptRequest{
-		Ciphertext: cr.Spec.Provider.GoogleCloud.Data,
-	}
-
-	logrus.Debugln("Sending decrypt request")
-	reqCall := h.CloudKMS.Projects.Locations.KeyRings.CryptoKeys.Decrypt(parent, req)
-	resp, err := reqCall.Do()
-	if err != nil {
-		return err
-	}
-
-	// Base64 decode after KMS call
-	b, err := base64.StdEncoding.DecodeString(resp.Plaintext)
-	if err != nil {
-		return err
-	}
-
-	b, err = base64.StdEncoding.DecodeString(string(b))
+	b, err := h.Decryptor.Decrypt(cr)
 	if err != nil {
 		return err
 	}
